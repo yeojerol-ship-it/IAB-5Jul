@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IAB Prototype</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'TikTok Sans', system-ui, -apple-system, sans-serif;
+    }
+
+    /* ── Phone shell ── */
+    .phone {
+      width: 390px;
+      height: 844px;
+      background: #000;
+      border-radius: 0;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08);
+    }
+
+    /* ── POI Page ── */
+    .screen-poi {
+      position: absolute;
+      inset: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      background: #fff;
+    }
+    .screen-poi::-webkit-scrollbar { display: none; }
+    .screen-poi img {
+      display: block;
+      width: 390px;
+      height: auto;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    /* Invisible tap hotspot over the "Select" button on the hotel card */
+    .select-hotspot {
+      position: absolute;
+      left: 262px;
+      top: 855px;
+      width: 98px;
+      height: 40px;
+      cursor: pointer;
+      /* debug: uncomment to see */
+      /* background: rgba(255,0,0,0.3); */
+    }
+
+    /* ── Loading Overlay ── */
+    .screen-loading {
+      position: absolute;
+      inset: 0;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      border-radius: 0;
+
+      /* starts below the phone, slides up on trigger */
+      transform: translateY(100%);
+      transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+      will-change: transform;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .screen-loading.open {
+      transform: translateY(0);
+      pointer-events: all;
+    }
+
+    /* Status bar */
+    .status-bar {
+      height: 47px;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      flex-shrink: 0;
+    }
+    .status-time {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.4px;
+      color: #000;
+    }
+    .status-icons {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      opacity: 0.85;
+    }
+    .status-icons svg { display: block; }
+
+    /* Nav bar */
+    .nav-bar {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      flex-shrink: 0;
+    }
+    .close-btn {
+      width: 40px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .close-btn svg { display: block; }
+
+    /* Loading body — top padding reserves space for shared nav (183px) minus 32px nudge up */
+    .loading-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      padding-top: 79px;
+      padding-bottom: 80px;
+      box-sizing: border-box;
+    }
+
+    /* ── Icon shuffle area ── */
+    .icon-pair {
+      position: relative;
+      width: 220px;
+      height: 118px;
+      isolation: isolate;
+      /* No float on the container — each icon handles its own movement */
+    }
+
+    /* Both icons share the same anchor point (container center).
+       JS drives all transforms; CSS transition interpolates them. */
+    .icon-anim {
+      position: absolute;
+      width: 98px;
+      height: 98px;
+      left: 50%;
+      top: 50%;
+      margin-left: -49px;
+      margin-top: -49px;
+      transform-origin: center center;
+      will-change: transform, filter;
+    }
+
+    /* Default CSS positions — prevents icons stacking at center before JS runs */
+    .icon-anim-left  { transform: translateX(-55px) rotate(-7deg) scale(1); z-index: 2; }
+    .icon-anim-right { transform: translateX( 55px) rotate( 7deg) scale(1); z-index: 1; }
+
+    /* Animated state — JS adds this class to enable the transition */
+    .icon-anim.can-transition {
+      transition: transform 660ms cubic-bezier(0.4, 0, 0.2, 1),
+                  filter    660ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Icon images fill the wrapper */
+    .icon-anim img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      will-change: transform;
+    }
+    /* Individual bob — same period, half-cycle offset creates natural opposing sway */
+    .icon-anim-left img {
+      animation: iconBobLeft 3.2s ease-in-out infinite;
+      transform-origin: center bottom;
+    }
+    .icon-anim-right img {
+      animation: iconBobRight 3.2s ease-in-out infinite;
+      animation-delay: -1.6s;   /* half period = opposing phase */
+      transform-origin: center bottom;
+    }
+    @keyframes iconBobLeft {
+      0%, 100% { transform: rotate(-3.5deg) translateY(0px);   }
+      50%      { transform: rotate(3.5deg)  translateY(-14px); }
+    }
+    @keyframes iconBobRight {
+      0%, 100% { transform: rotate(3.5deg)  translateY(0px);   }
+      50%      { transform: rotate(-3.5deg) translateY(-14px); }
+    }
+
+    /* ── Shimmer text ── */
+    .loading-text {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-align: center;
+      background: linear-gradient(
+        90deg,
+        #000 0%,
+        #000 20%,
+        #b0b0b0 40%,
+        #e8e8e8 50%,
+        #b0b0b0 60%,
+        #000 80%,
+        #000 100%
+      );
+      background-size: 250% 100%;
+      background-repeat: no-repeat;   /* prevents tiled ghost band */
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      /* 0%→100% keeps the 250%-wide gradient covering the text at all times.
+         At 0%  the shine sits just off the right edge (invisible).
+         At 100% the shine sits just off the left  edge (invisible).
+         Sweep occupies first 55% of cycle; remaining 45% is a dark pause. */
+      animation: textSweep 1.6s linear infinite;
+    }
+
+    @keyframes textSweep {
+      0%   { background-position: 100% 0; }
+      75%  { background-position: 0%   0; }
+      100% { background-position: 0%   0; }
+    }
+
+    /* ── Exit animations ── */
+
+    /* Text fades out */
+    .loading-text.exit {
+      animation: textFadeOut 0.32s ease forwards;
+    }
+    @keyframes textFadeOut {
+      to { opacity: 0; }
+    }
+
+    /* Icon pair: dip + shrink, then snappy shoot up */
+    .icon-pair.exit {
+      animation: iconPairExit 0.52s cubic-bezier(0.5, 0, 1, 1) forwards;
+    }
+    @keyframes iconPairExit {
+      0%   { transform: translateY(0px)   scale(1);    }
+      30%  { transform: translateY(38px)  scale(0.72); }  /* dip + shrink */
+      100% { transform: translateY(-620px) scale(0);   } /* snappy shoot up, vanish */
+    }
+
+    /* ── Webview screen (background content) ── */
+    .screen-webview {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+      overflow-y: scroll;
+      -webkit-overflow-scrolling: touch;
+      /* hide scrollbar but keep scrollable */
+      scrollbar-width: none;
+    }
+    .screen-webview::-webkit-scrollbar { display: none; }
+    .screen-webview.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+    .webview-bg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    /* ── Shared nav bar — single source of truth, all states ── */
+    .webview-nav {
+      position: absolute;
+      top: 0; left: 0;
+      width: 390px;
+      height: 183px;
+      background: rgba(255, 255, 255, 1);
+      -webkit-backdrop-filter: blur(32px);
+              backdrop-filter: blur(32px);
+      border-bottom: 1px solid transparent;
+      z-index: 35;
+      pointer-events: none;
+      transform: translateY(900px);
+      transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1),
+                  height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                  border-color 0.3s ease;
+      will-change: transform, height;
+      overflow: hidden;
+    }
+    /* Separator only visible once webview content is loaded */
+    .webview-nav.wv-content-visible {
+      border-bottom-color: rgba(22, 24, 35, 0.12);
+    }
+    .webview-nav.nav-active {
+      transform: translateY(0);
+    }
+
+    /* ── Status bar — PNG clipped to top 47px, always visible ── */
+    .wv-status-img {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      clip-path: inset(0 0 calc(100% - 47px) 0);
+      z-index: 10; pointer-events: none;
+    }
+
+    /* ── State 2: 5s — progress bar dismissed, nav 120px ── */
+    .webview-nav.nav-5s {
+      height: 120px;
+    }
+    .nav-5s .pb-track-svg,
+    .nav-5s .pb-fill,
+    .nav-5s .pb-lbl,
+    .nav-5s .pb-plane {
+      opacity: 0 !important;
+      pointer-events: none;
+    }
+
+    /* ── State 3: scroll-collapsed — only status bar + cashback ── */
+    .webview-nav.nav-scroll-collapsed {
+      height: 90px;
+    }
+    .nav-scroll-collapsed .wv-close,
+    .nav-scroll-collapsed .wv-more {
+      opacity: 0;
+      transform: scale(0);
+      pointer-events: none;
+    }
+    .nav-scroll-collapsed .wv-logo-row {
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+    }
+    .nav-scroll-collapsed .wv-center {
+      top: 52px;
+      gap: 0;
+    }
+    .nav-scroll-collapsed .pb-track-svg,
+    .nav-scroll-collapsed .pb-fill,
+    .nav-scroll-collapsed .pb-lbl,
+    .nav-scroll-collapsed .pb-plane {
+      opacity: 0 !important;
+      pointer-events: none;
+    }
+
+    /* Webview-only content: hidden during loading, fades in when webview loads */
+    .wv-center,
+    .wv-more,
+    .pb-track-svg,
+    .pb-lbl,
+    .pb-fill,
+    .pb-plane {
+      opacity: 0;
+      transition: opacity 0.35s ease;
+    }
+    .webview-nav.wv-content-visible .wv-center,
+    .webview-nav.wv-content-visible .wv-more,
+    .webview-nav.wv-content-visible .pb-track-svg,
+    .webview-nav.wv-content-visible .pb-lbl,
+    .webview-nav.wv-content-visible .pb-fill,
+    .webview-nav.wv-content-visible .pb-plane {
+      opacity: 1;
+    }
+
+    /* ── Webview nav — absolute-positioned elements matching Figma ── */
+
+    /* X close — interactive in both loading and webview states */
+    .wv-close {
+      position: absolute;
+      left: 8px; top: 53px;
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 10; pointer-events: all; cursor: pointer;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    /* Centre column: logos + cashback pill, flex-col gap=8px per Figma */
+    .wv-center {
+      position: absolute;
+      left: 125px; top: 58px;
+      width: 140px;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      z-index: 2; pointer-events: none;
+      transition: top 0.35s ease, gap 0.3s ease;
+    }
+    /* Single Figma-exported PNG: TikTok mark · GO badge · separator · Booking.com */
+    .wv-logo-row {
+      height: 17px; width: auto; display: block;
+      transition: max-height 0.3s ease, opacity 0.3s ease;
+      max-height: 40px; overflow: hidden;
+    }
+    /* Cashback pill — child of .wv-center, gap-8px handled by flexbox */
+    .wv-cashback {
+      padding: 4px 12px 4px 10px;
+      border-radius: 100px;
+      background: linear-gradient(97.19deg,
+        rgba(253,147,216,0.07) 5.09%,
+        rgba(254,44,85,0.056)  87.93%
+      );
+      font-size: 10px; font-weight: 600;
+      font-family: 'TikTok Sans', system-ui, -apple-system, sans-serif;
+      color: #e10543; white-space: nowrap;
+      pointer-events: all;
+      cursor: pointer;
+    }
+    /* Ellipsis more: left=342, top=53, 40×40 */
+    .wv-more {
+      position: absolute;
+      left: 342px; top: 53px;
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 2; pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    /* ── Progress bar: exact Figma dumbbell shape ── */
+
+    /* Track: 48px padding each side → width = 390-96 = 294px; height proportional */
+    .pb-track-svg {
+      position: absolute;
+      left: 48px; top: 126px;
+      width: 294px; height: 13.5px;
+      display: block;
+      z-index: 2; pointer-events: none;
+    }
+
+    /* Fill: same proportional size, gradient masked to dumbbell silhouette */
+    .pb-fill {
+      position: absolute;
+      left: 48px; top: 126px;
+      width: 294px; height: 13.5px;
+      background: linear-gradient(90deg,
+        #FE3153  0%,
+        #EB32A7 20%,
+        #F280BE 48%,
+        #FCEEF2 90%
+      );
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 295 13.5543'%3E%3Cpath fill='white' d='M286.957 0.121706C291.132 -0.673341 295 2.52778 295 6.77796C295 10.9009 291.348 14.0679 287.267 13.485L285.796 13.275C284.938 13.1525 284.104 12.8921 283.329 12.5045L281.188 11.4342C280.078 10.8792 278.854 10.5905 277.612 10.5905H17.3877C16.1463 10.5905 14.922 10.8792 13.8115 11.4342L11.6709 12.5045C10.8957 12.8921 10.0621 13.1525 9.2041 13.275L7.7334 13.485C3.65187 14.0679 0.000228102 10.9009 0 6.77796C8.38944e-06 2.52778 3.86787 -0.673341 8.04297 0.121706L8.71094 0.249635C9.88572 0.473416 10.988 0.981072 11.9219 1.72815L13.3086 2.83753C14.7269 3.9721 16.4894 4.59036 18.3057 4.59046H276.694C278.511 4.59036 280.273 3.97212 281.691 2.83753L283.078 1.72815C284.012 0.98107 285.114 0.473415 286.289 0.249635L286.957 0.121706Z'/%3E%3C/svg%3E");
+              mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 295 13.5543'%3E%3Cpath fill='white' d='M286.957 0.121706C291.132 -0.673341 295 2.52778 295 6.77796C295 10.9009 291.348 14.0679 287.267 13.485L285.796 13.275C284.938 13.1525 284.104 12.8921 283.329 12.5045L281.188 11.4342C280.078 10.8792 278.854 10.5905 277.612 10.5905H17.3877C16.1463 10.5905 14.922 10.8792 13.8115 11.4342L11.6709 12.5045C10.8957 12.8921 10.0621 13.1525 9.2041 13.275L7.7334 13.485C3.65187 14.0679 0.000228102 10.9009 0 6.77796C8.38944e-06 2.52778 3.86787 -0.673341 8.04297 0.121706L8.71094 0.249635C9.88572 0.473416 10.988 0.981072 11.9219 1.72815L13.3086 2.83753C14.7269 3.9721 16.4894 4.59036 18.3057 4.59046H276.694C278.511 4.59036 280.273 3.97212 281.691 2.83753L283.078 1.72815C284.012 0.98107 285.114 0.473415 286.289 0.249635L286.957 0.121706Z'/%3E%3C/svg%3E");
+      -webkit-mask-size: 100% 100%;
+              mask-size: 100% 100%;
+      mask-repeat: no-repeat;
+      /* Fully hidden initially */
+      clip-path: inset(0 294px 0 0);
+      z-index: 3; pointer-events: none;
+    }
+    .pb-fill.animate {
+      /* Track 294px. Plane lands at midpoint (147px from track left).
+         Right clip = 294 - 147 = 147px                                   */
+      clip-path: inset(0 147px 0 0);
+      /* Keep opacity transition so it doesn't abort mid-fade when animate is added */
+      transition: opacity 0.35s ease, clip-path 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Step labels — centered under each circle/midpoint via translateX(-50%) */
+    .pb-lbl {
+      position: absolute;
+      /* track top(126) + height(13.5) + gap(14) = 153.5px */
+      top: 154px;
+      font-size: 10px;
+      color: rgba(0, 0, 0, 0.65);
+      white-space: nowrap;
+      z-index: 4;
+      pointer-events: none;
+      font-family: 'TikTok Sans', system-ui, -apple-system, sans-serif;
+      letter-spacing: 0;
+      transform: translateX(-50%);
+    }
+    /* Circle centers: left-end x=55, mid x=195, right-end x=335 (all in nav coords) */
+    .pb-lbl1 { left: 55px;  }
+    .pb-lbl2 { left: 195px; }
+    .pb-lbl3 { left: 335px; }
+
+    /* Plane: starts over left circle, animates to midpoint */
+    .pb-plane {
+      position: absolute;
+      width: 36px; height: 36px;
+      top: 115px;
+      left: 37px;
+      transform: rotate(90deg);
+      transform-origin: center center;
+      z-index: 5;
+      pointer-events: none;
+      transition: opacity 0.35s ease, left 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .pb-plane > img { width: 100%; height: 100%; display: block; }
+    .pb-plane.animate {
+      left: 177px;
+    }
+
+    /* Sparkle burst stars */
+    .pb-sparkle {
+      position: absolute;
+      width: var(--sz, 14px);
+      height: var(--sz, 14px);
+      z-index: 6;
+      pointer-events: none;
+      clip-path: polygon(50% 0%, 56% 44%, 100% 50%, 56% 56%, 50% 100%, 44% 56%, 0% 50%, 44% 44%);
+      background: var(--color, #ff2d55);
+      animation: sparkleOut var(--dur, 0.65s) cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    }
+    @keyframes sparkleOut {
+      0%   { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); }
+      55%  { opacity: 0.9; }
+      100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0) rotate(60deg); }
+    }
+    /* ── Cashback Popover ── */
+    .popover-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 50;
+      background: rgba(0,0,0,0.5);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .popover-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+    .popover-sheet {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 368px;
+      background: #fff;
+      border-radius: 26px 26px 0 0;
+      display: flex;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+      overflow: hidden;
+    }
+    .popover-overlay.open .popover-sheet {
+      transform: translateY(0);
+    }
+    .popover-close-btn {
+      position: absolute;
+      top: 14px; right: 13px;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #f5f5f5;
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0;
+    }
+    .popover-illustration {
+      position: relative;
+      height: 68px;
+      margin: 68px 32px 0;
+      display: flex; align-items: center;
+    }
+    .pop-line {
+      position: absolute;
+      height: 14px; width: 149px;
+    }
+    .pop-line-top {
+      left: 134px; top: 15px;
+      transform: scaleY(-1) rotate(180deg);
+    }
+    .pop-line-bottom {
+      left: 2px; top: 16px;
+    }
+    /* Gradient fill — masked to the line SVG shape, clip-path reveals left→right
+       in lockstep with plane travel.
+       Line sits at left:2px, so plane center at rest relative to fill-left =
+       (108 + 23.5) - 2 = 129.5px out of fill width 149px → right inset ≈ 13% */
+    .pop-fill {
+      position: absolute;
+      left: 2px; top: 16px;
+      width: 149px; height: 14px;
+      background: linear-gradient(90deg,
+        #ff2d55 0%, #ff6b9d 50%, #fe85b3 80%, rgba(254,133,179,0.3) 100%);
+      mask-image: url('assets/popover-line-bottom.svg');
+      -webkit-mask-image: url('assets/popover-line-bottom.svg');
+      mask-size: 149px 14px;
+      mask-repeat: no-repeat;
+      clip-path: inset(0 100% 0 0);
+      transition: clip-path 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+      z-index: 2;
+    }
+    .pop-fill {
+      clip-path: inset(0 13% 0 0);
+    }
+    .pop-plane {
+      position: absolute;
+      left: 108px; top: 0;
+      width: 47px; height: 47px;
+      transform: rotate(90deg);
+      object-fit: contain;
+      z-index: 3;
+    }
+    .pop-badge {
+      position: absolute;
+      right: 0; top: 9px;
+      background: #fff0f3;
+      color: #e10543;
+      font-family: 'TikTok Sans', system-ui, -apple-system, sans-serif;
+      font-size: 14px; font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 100px;
+      white-space: nowrap;
+    }
+    .popover-body {
+      padding: 32px 32px 0;
+      display: flex; flex-direction: column; gap: 12px;
+      text-align: center;
+    }
+    .pop-title {
+      font-family: 'TikTok Sans', system-ui, -apple-system, sans-serif;
+      font-size: 20px; font-weight: 600; line-height: 1.3;
+      color: #000; margin: 0;
+    }
+    .pop-desc {
+      font-family: 'TikTok Sans', system-ui, -apple-system, sans-serif;
+      font-size: 14px; font-weight: 400; line-height: 1.3;
+      color: rgba(0,0,0,0.65); margin: 0;
+    }
+    .pop-desc strong {
+      font-weight: 600; color: rgba(0,0,0,0.65);
+    }
+    .popover-cta {
+      margin-top: auto;
+      padding: 32px 24px 34px;
+      flex-shrink: 0;
+    }
+    .pop-cta-btn {
+      width: 100%; height: 52px;
+      border: none; border-radius: 100px; cursor: pointer;
+      background: linear-gradient(135deg, #ff4e6a 0%, #ff2442 100%);
+      color: #fff;
+      font-family: 'TikTok Sans', system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      -webkit-font-smoothing: antialiased;
+    }
+  </style>
+</head>
+<body>
+
+<div class="phone">
+
+  <!-- ── POI Page ── -->
+  <div class="screen-poi" id="screenPoi">
+    <img src="assets/poi-page.png" alt="POI Page" />
+    <div class="select-hotspot" id="selectHotspot" title="Tap to select hotel"></div>
+  </div>
+
+  <!-- ── Loading Overlay ── -->
+  <div class="screen-loading" id="screenLoading">
+
+    <!-- Loading Body — nav handled by shared #webviewNav overlay -->
+    <div class="loading-body">
+      <div class="icon-pair" id="iconPair">
+        <div class="icon-anim icon-anim-left" id="iconLeft">
+          <img src="assets/icon-tiktokgo-full.png" alt="TikTok GO" />
+        </div>
+        <div class="icon-anim icon-anim-right" id="iconRight">
+          <img src="assets/icon-booking-full.png" alt="Booking.com" />
+        </div>
+      </div>
+      <p class="loading-text">Activating your cashback</p>
+    </div>
+
+  </div>
+
+  <!-- ── Webview content (fades in after exit) ── -->
+  <div class="screen-webview" id="screenWebview">
+    <img class="webview-bg" src="assets/webview-content.png" alt="Webview" draggable="false" />
+  </div>
+
+  <!-- ── Webview nav bar overlay — single component, all states ── -->
+  <div class="webview-nav" id="webviewNav">
+
+    <!-- Status bar — PNG, clipped to top 47px only -->
+    <img class="wv-status-img" src="assets/webview-navbar.png" alt="" draggable="false" />
+
+    <!-- ── X close button — shared for loading + webview states ── -->
+    <div class="wv-close" id="closeBtn">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M2 2L16 16M16 2L2 16" stroke="black" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <!-- ── Centre: TikTok GO + Booking.com + cashback pill (flex-col, gap=8px) ── -->
+    <div class="wv-center">
+      <img class="wv-logo-row" src="assets/nav-logo-row.png" alt="" draggable="false" />
+      <div class="wv-cashback" id="cashbackLabel">$60 cashback activated</div>
+    </div>
+
+    <!-- ── Ellipsis more button (code) ── -->
+    <div class="wv-more">
+      <svg width="20" height="5" viewBox="0 0 20 5" fill="none">
+        <circle cx="2.5"  cy="2.5" r="2.5" fill="black"/>
+        <circle cx="10"   cy="2.5" r="2.5" fill="black"/>
+        <circle cx="17.5" cy="2.5" r="2.5" fill="black"/>
+      </svg>
+    </div>
+
+    <!-- ── Progress bar track: exact Figma dumbbell SVG, light-pink fill ── -->
+    <svg class="pb-track-svg" viewBox="0 0 295 13.5543" preserveAspectRatio="xMidYMid meet">
+      <path fill="#FCEEF2" d="M286.957 0.121706C291.132 -0.673341 295 2.52778 295 6.77796C295 10.9009 291.348 14.0679 287.267 13.485L285.796 13.275C284.938 13.1525 284.104 12.8921 283.329 12.5045L281.188 11.4342C280.078 10.8792 278.854 10.5905 277.612 10.5905H17.3877C16.1463 10.5905 14.922 10.8792 13.8115 11.4342L11.6709 12.5045C10.8957 12.8921 10.0621 13.1525 9.2041 13.275L7.7334 13.485C3.65187 14.0679 0.000228102 10.9009 0 6.77796C8.38944e-06 2.52778 3.86787 -0.673341 8.04297 0.121706L8.71094 0.249635C9.88572 0.473416 10.988 0.981072 11.9219 1.72815L13.3086 2.83753C14.7269 3.9721 16.4894 4.59036 18.3057 4.59046H276.694C278.511 4.59036 280.273 3.97212 281.691 2.83753L283.078 1.72815C284.012 0.98107 285.114 0.473415 286.289 0.249635L286.957 0.121706Z"/>
+    </svg>
+
+    <!-- Animated gradient fill (grows left→right in sync with plane) -->
+    <div class="pb-fill" id="pbFill"></div>
+
+    <!-- Step labels centred under each step position -->
+    <div class="pb-lbl pb-lbl1">View hotel info</div>
+    <div class="pb-lbl pb-lbl2">Book online</div>
+    <div class="pb-lbl pb-lbl3">Get $60 cashback</div>
+
+    <!-- Animated plane icon — flies from track-left to Figma resting position -->
+    <div class="pb-plane" id="pbPlane">
+      <img src="assets/nav-plane.png" alt="" />
+    </div>
+  </div><!-- /.webview-nav -->
+
+  <!-- ── Cashback popover ── -->
+  <div class="popover-overlay" id="popoverOverlay">
+    <div class="popover-sheet" id="popoverSheet">
+
+      <!-- Close button -->
+      <button class="popover-close-btn" id="popoverCloseBtn" aria-label="Close">
+        <img src="assets/popover-close.svg" width="20" height="20" alt="" />
+      </button>
+
+      <!-- Illustration: lines + animated plane + gradient fill + badge -->
+      <div class="popover-illustration">
+        <img class="pop-line pop-line-top"    src="assets/popover-line-top.svg"    alt="" />
+        <img class="pop-line pop-line-bottom" src="assets/popover-line-bottom.svg" alt="" />
+        <div class="pop-fill" id="popFill"></div>
+        <img class="pop-plane" id="popPlane" src="assets/popover-plane.png" alt="" />
+        <div class="pop-badge">$60 cashback</div>
+      </div>
+
+      <!-- Text -->
+      <div class="popover-body">
+        <h2 class="pop-title">Continue booking and enjoy $60 cashback on us</h2>
+        <p class="pop-desc">Pay at checkout and enjoy $60 cashback 45 days after your stay. <strong>Learn more</strong></p>
+      </div>
+
+      <!-- CTA -->
+      <div class="popover-cta">
+        <button class="pop-cta-btn">Continue to book</button>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const selectHotspot = document.getElementById('selectHotspot');
+  const screenLoading = document.getElementById('screenLoading');
+  const screenWebview = document.getElementById('screenWebview');
+  const closeBtn      = document.getElementById('closeBtn');
+  const TIKTOK        = document.getElementById('iconLeft');
+  const BOOKING       = document.getElementById('iconRight');
+  const iconPair      = document.getElementById('iconPair');
+  const iconPairHome  = iconPair.parentElement; // original parent (.loading-body)
+  const phone         = document.querySelector('.phone');
+  const loadingText   = document.querySelector('.loading-text');
+  const webviewNav = document.getElementById('webviewNav');
+  const pbFill     = document.getElementById('pbFill');
+  const pbPlane    = document.getElementById('pbPlane');
+
+  // ── Two slots — 12px gap at rest ──────────────────────────────
+  // Each icon is 98px wide; ±55px from center → gap = 12px
+  const L = { tx: -55, rot: -7 };
+  const R = { tx:  55, rot:  7 };
+
+  const SWAP_MS = 660;
+  const HOLD_MS = 340;
+
+  // Build transform string for a slot + optional depth state
+  function tf(slot, behind = false) {
+    const s = 1;
+    return `translateX(${slot.tx}px) rotate(${slot.rot}deg) scale(${s})`;
+  }
+  function br() {
+    return `brightness(1)`;
+  }
+
+  // Place WITHOUT transition (instant snap)
+  function snap(el, slot) {
+    el.classList.remove('can-transition');
+    el.style.transform = tf(slot);
+    el.style.filter    = br();
+  }
+
+  // Move WITH transition (animated)
+  function move(el, slot, behind = false) {
+    el.classList.add('can-transition');
+    el.style.transform = tf(slot, behind);
+    el.style.filter    = br(behind);
+  }
+
+  // ── Async helpers ─────────────────────────────────────────────
+  let running = false;
+  let timers  = [];
+
+  function wait(ms) {
+    return new Promise(r => { timers.push(setTimeout(r, ms)); });
+  }
+  // Two rAFs — guarantees the browser has painted the snap before we animate
+  function nextPaint() {
+    return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  }
+  function killAll() {
+    running = false;
+    timers.forEach(clearTimeout);
+    timers = [];
+  }
+
+  const STACK = { tx: 0, rot: 0 }; // fully overlapping centre position
+
+  // ── Shuffle loop ──────────────────────────────────────────────
+  async function shuffleLoop() {
+    // ── ENTRY: both icons start stacked, then fan out ────────────
+    snap(TIKTOK,  STACK); TIKTOK.style.zIndex  = '2';
+    snap(BOOKING, STACK); BOOKING.style.zIndex = '1';
+
+    await nextPaint();
+    if (!running) return;
+
+    // Fan out to resting gap positions (uses SWAP_MS transition)
+    move(TIKTOK,  L);
+    move(BOOKING, R);
+    await wait(SWAP_MS);
+    if (!running) return;
+
+    // Track which slot each icon is currently in
+    let tSlot = L, bSlot = R, beat = 0;
+
+    while (running) {
+      await wait(HOLD_MS);
+      if (!running) break;
+
+      // Each icon moves to the other's current slot
+      const nextT = bSlot;
+      const nextB = tSlot;
+
+      if (beat % 2 === 0) {
+        // TikTok goes BEHIND ──────────────────────────────────
+        TIKTOK.style.zIndex  = '0';
+        BOOKING.style.zIndex = '3';
+        move(TIKTOK,  nextT, true);
+        move(BOOKING, nextB, false);
+      } else {
+        // Booking goes BEHIND ─────────────────────────────────
+        TIKTOK.style.zIndex  = '3';
+        BOOKING.style.zIndex = '0';
+        move(TIKTOK,  nextT, false);
+        move(BOOKING, nextB, true);
+      }
+
+      tSlot = nextT;
+      bSlot = nextB;
+      beat++;
+
+      await wait(SWAP_MS);
+      if (!running) break;
+
+      // Icons are now separated — safe to reset z-index
+      TIKTOK.style.zIndex  = '2';
+      BOOKING.style.zIndex = '1';
+    }
+  }
+
+  // ── Reset to default state ────────────────────────────────────
+  function resetIcons() {
+    // Move icon-pair back to its original parent if it was reparented
+    if (iconPair.parentElement !== iconPairHome) {
+      iconPair.style.position = '';
+      iconPair.style.left     = '';
+      iconPair.style.top      = '';
+      iconPair.style.margin   = '';
+      iconPair.style.zIndex   = '';
+      iconPair.style.animation = '';
+      iconPairHome.insertBefore(iconPair, loadingText);
+    }
+    snap(TIKTOK,  L); TIKTOK.style.zIndex  = '2';
+    snap(BOOKING, R); BOOKING.style.zIndex = '1';
+  }
+
+  // ── Exit animation then webview ───────────────────────────────
+  async function playExitThenWebview() {
+    running = false;
+
+    // Freeze icons at their current painted position (may be mid-transition)
+    [TIKTOK, BOOKING].forEach(el => {
+      const live = getComputedStyle(el).transform;
+      el.classList.remove('can-transition');
+      el.style.transform = live;
+    });
+    await nextPaint(); // let the freeze render
+
+    // 1. Logos merge to 32px overlap (660ms)
+    TIKTOK.classList.add('can-transition');
+    BOOKING.classList.add('can-transition');
+    TIKTOK.style.zIndex  = '2';
+    BOOKING.style.zIndex = '1';
+    TIKTOK.style.transform  = `translateX(-33px) rotate(-7deg) scale(1)`;
+    BOOKING.style.transform = `translateX( 33px) rotate( 7deg) scale(1)`;
+    await wait(660);
+
+    // 1b. Continue to fully stacked (tx=0, rot=0, 380ms)
+    TIKTOK.style.transform  = `translateX(0px) rotate(0deg) scale(1)`;
+    BOOKING.style.transform = `translateX(0px) rotate(0deg) scale(1)`;
+    await wait(380);
+
+    // 2. Text fades out — wait for it to fully disappear before moving logos
+    loadingText.classList.add('exit');
+    await wait(320); // matches textFadeOut duration (0.32s)
+
+    // 3. Reparent icon-pair to phone level so it escapes the loading screen's
+    //    stacking context (z-index 10) and can fly above the nav (z-index 35).
+    await wait(80);
+    {
+      const r = iconPair.getBoundingClientRect();
+      const p = phone.getBoundingClientRect();
+      iconPair.style.position = 'absolute';
+      iconPair.style.left     = (r.left - p.left) + 'px';
+      iconPair.style.top      = (r.top  - p.top)  + 'px';
+      iconPair.style.margin   = '0';
+      iconPair.style.zIndex   = '40';
+      iconPair.style.animation = 'none'; // stop float
+      phone.appendChild(iconPair);
+    }
+    await nextPaint();
+    iconPair.style.animation = ''; // clear inline override so CSS exit class takes effect
+    iconPair.classList.add('exit');
+
+    // 4. Logos have entered the nav — reveal header content
+    await wait(400);
+    webviewNav.classList.add('wv-content-visible');
+
+    // 5. Slight stagger → animate progress fill + plane
+    await wait(200);
+    pbFill.classList.add('animate');
+    pbPlane.classList.add('animate');
+
+    // 6. Sparkle trail while travelling + burst on landing
+    startSparkleTrail();
+
+    // 6. Logos fully off-screen → fade in body
+    await wait(40);
+    screenWebview.classList.add('open');
+
+    // 7. Remove loading overlay once webview has faded in
+    await wait(400);
+    screenLoading.classList.remove('open');
+
+    // 8. After 5s, dismiss progress bar and collapse to 120px
+    timers.push(setTimeout(() => {
+      webviewNav.classList.add('nav-5s');
+    }, 5000));
+  }
+
+  // ── Sparkle helpers ───────────────────────────────────────────
+  const sparklePalette = ['#ff2d55', '#ff6b9d', '#fe3678', '#fc375e', '#ffb3d1', '#ff85a1'];
+
+  function emitSparkle(container, cx, cy, sz, dist, angle, dur) {
+    const rad = (angle * Math.PI) / 180;
+    const tx = (Math.cos(rad) * dist).toFixed(1);
+    const ty = (Math.sin(rad) * dist).toFixed(1);
+    const color = sparklePalette[Math.floor(Math.random() * sparklePalette.length)];
+    const el = document.createElement('div');
+    el.className = 'pb-sparkle';
+    el.style.cssText = `left:${cx - sz/2}px;top:${cy - sz/2}px;--sz:${sz}px;--color:${color};--tx:${tx}px;--ty:${ty}px;--dur:${dur}s;`;
+    container.appendChild(el);
+    setTimeout(() => el.remove(), dur * 1000 + 100);
+  }
+
+  function startSparkleTrail() {
+    const navRect = webviewNav.getBoundingClientRect();
+    const planeEl = pbPlane;
+    const cy = 133;
+    let elapsed = 0;
+    const interval = setInterval(() => {
+      elapsed += 110;
+      if (elapsed > 920) { clearInterval(interval); return; }
+      const r = planeEl.getBoundingClientRect();
+      const cx = r.left - navRect.left + r.width / 2;
+      emitSparkle(webviewNav, cx, cy, 10 + Math.random() * 5, 16 + Math.random() * 10,
+        140 + Math.random() * 30, 0.45 + Math.random() * 0.15);
+      emitSparkle(webviewNav, cx, cy, 10 + Math.random() * 5, 16 + Math.random() * 10,
+        190 + Math.random() * 30, 0.45 + Math.random() * 0.15);
+    }, 110);
+  }
+
+  // ── Popover plane animation + sparkles ────────────────────────
+  const popFill  = document.getElementById('popFill');
+  const popPlane = document.getElementById('popPlane');
+  const popSheet = document.getElementById('popoverSheet');
+  let popSparkleTimer = null;
+
+  // Plane resting centre inside the sheet:
+  // illustration margin-left(32) + plane rest left(108) + half-width(23.5) ≈ 164
+  // illustration margin-top(68) + half plane height(23.5) ≈ 92
+  const POP_CX = 164, POP_CY = 92;
+
+  function startPopoverAnimation() {}
+
+  function resetPopoverAnimation() {
+    clearTimeout(popSparkleTimer);
+  }
+
+  // ── Open / Close ──────────────────────────────────────────────
+  function openLoading() {
+    // Reset state in case of re-open
+    loadingText.classList.remove('exit');
+    iconPair.classList.remove('exit');
+    webviewNav.classList.remove('wv-content-visible', 'nav-5s', 'nav-scroll-collapsed');
+    pbFill.classList.remove('animate');
+    pbPlane.classList.remove('animate');
+    screenWebview.scrollTop = 0;
+
+    // Show shared nav (loading state: only status bar + X visible)
+    webviewNav.classList.add('nav-active');
+
+    screenLoading.classList.add('open');
+    running = true;
+    shuffleLoop();
+
+    // Simulate webview ready after 4.3s
+    timers.push(setTimeout(playExitThenWebview, 4300));
+  }
+
+  function closeLoading() {
+    killAll();
+    resetIcons();
+    loadingText.classList.remove('exit');
+    iconPair.classList.remove('exit');
+    webviewNav.classList.remove('nav-active', 'wv-content-visible', 'nav-5s', 'nav-scroll-collapsed');
+    pbFill.classList.remove('animate');
+    pbPlane.classList.remove('animate');
+    screenLoading.classList.remove('open');
+    screenWebview.classList.remove('open');
+    screenWebview.scrollTop = 0;
+  }
+
+  // ── Scroll collapse ───────────────────────────────────────────
+  screenWebview.addEventListener('scroll', () => {
+    if (!webviewNav.classList.contains('wv-content-visible')) return;
+    if (screenWebview.scrollTop > 10) {
+      webviewNav.classList.add('nav-scroll-collapsed');
+    } else {
+      webviewNav.classList.remove('nav-scroll-collapsed');
+    }
+  });
+
+  selectHotspot.addEventListener('click', openLoading);
+  closeBtn.addEventListener('click', closeLoading);
+
+  // ── Cashback popover ──────────────────────────────────────────
+  const popoverOverlay   = document.getElementById('popoverOverlay');
+  const popoverCloseBtn  = document.getElementById('popoverCloseBtn');
+  const cashbackLabel    = document.getElementById('cashbackLabel');
+
+  function openPopover() {
+    resetPopoverAnimation();
+    popoverOverlay.classList.add('open');
+    startPopoverAnimation();
+  }
+  function closePopover() {
+    popoverOverlay.classList.remove('open');
+    resetPopoverAnimation();
+  }
+
+  const popCtaBtn = document.querySelector('.pop-cta-btn');
+
+  cashbackLabel.addEventListener('click', openPopover);
+  popoverCloseBtn.addEventListener('click', closePopover);
+  popCtaBtn.addEventListener('click', closePopover);
+  // Tap overlay background (outside sheet) to dismiss
+  popoverOverlay.addEventListener('click', (e) => {
+    if (e.target === popoverOverlay) closePopover();
+  });
+</script>
+
+</body>
+</html>
