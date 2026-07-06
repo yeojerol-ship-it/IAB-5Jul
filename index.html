@@ -452,16 +452,13 @@
       -webkit-mask-size: 100% 100%;
               mask-size: 100% 100%;
       mask-repeat: no-repeat;
-      /* Fully hidden initially */
-      clip-path: inset(0 294px 0 0);
+      /* Filled to midpoint by default — no entrance animation */
+      clip-path: inset(0 147px 0 0);
       z-index: 3; pointer-events: none;
+      transition: opacity 0.35s ease;
     }
     .pb-fill.animate {
-      /* Track 294px. Plane lands at midpoint (147px from track left).
-         Right clip = 294 - 147 = 147px                                   */
       clip-path: inset(0 147px 0 0);
-      /* Keep opacity transition so it doesn't abort mid-fade when animate is added */
-      transition: opacity 0.35s ease, clip-path 0.8s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     /* Step labels — centered under each circle/midpoint via translateX(-50%) */
@@ -486,19 +483,14 @@
     /* Plane: starts over left circle, animates to midpoint */
     .pb-plane {
       position: absolute;
-      width: 36px; height: 36px;
-      top: 115px;
-      left: 37px;
-      transform: rotate(90deg);
-      transform-origin: center center;
+      width: 66px; height: 53px;
+      top: 105px;
+      left: 147px;    /* rests centred on "Book online" — no entrance animation */
       z-index: 5;
       pointer-events: none;
-      transition: opacity 0.35s ease, left 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: opacity 0.35s ease;
     }
-    .pb-plane > img { width: 100%; height: 100%; display: block; }
-    .pb-plane.animate {
-      left: 177px;
-    }
+    .pb-plane > img { width: 100%; height: 100%; display: block; object-fit: contain; }
 
     /* Sparkle burst stars */
     .pb-sparkle {
