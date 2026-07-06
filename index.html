@@ -166,8 +166,6 @@
       margin-top: -49px;
       transform-origin: center center;
       will-change: transform, filter;
-      border-radius: 50%;
-      overflow: hidden;
     }
 
     /* Default CSS positions — prevents icons stacking at center before JS runs */
@@ -180,12 +178,14 @@
                   filter    660ms cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* Icon images fill the wrapper */
+    /* Icon images fill the wrapper — border-radius clips to circle without overflow:hidden
+       so the bob/rotate animations can move freely outside the wrapper bounds */
     .icon-anim img {
       width: 100%;
       height: 100%;
       display: block;
       will-change: transform;
+      border-radius: 50%;
     }
     /* Individual bob — same period, half-cycle offset creates natural opposing sway */
     .icon-anim-left img {
