@@ -457,9 +457,9 @@
 
     /* ── Progress bar shimmer overlay ── */
     @keyframes pbShimmer {
-      0%   { background-position: -80% 0%; }
-      55%  { background-position: 180% 0%; }
-      100% { background-position: 180% 0%; }  /* hold / pause before next sweep */
+      0%   { background-position: 100% 0%; }  /* band starts off left edge */
+      55%  { background-position: 0% 0%; }    /* band exits off right edge */
+      100% { background-position: 0% 0%; }    /* pause before next sweep */
     }
     .pb-shimmer {
       position: absolute;
