@@ -965,26 +965,13 @@
     await wait(400);
     webviewNav.classList.add('wv-content-visible');
 
-    // 5. Slight stagger → animate progress fill + plane
-    await wait(200);
-    pbFill.classList.add('animate');
-    pbPlane.classList.add('animate');
-
-    // 6. Sparkle trail while travelling + burst on landing
-    startSparkleTrail();
-
-    // 6. Logos fully off-screen → fade in body
+    // 5. Fade in webview body
     await wait(40);
     screenWebview.classList.add('open');
 
-    // 7. Remove loading overlay once webview has faded in
+    // 6. Remove loading overlay once webview has faded in
     await wait(400);
     screenLoading.classList.remove('open');
-
-    // 8. After 5s, dismiss progress bar and collapse to 120px
-    timers.push(setTimeout(() => {
-      webviewNav.classList.add('nav-5s');
-    }, 5000));
   }
 
   // ── Sparkle helpers ───────────────────────────────────────────
@@ -1043,7 +1030,7 @@
     // Reset state in case of re-open
     loadingText.classList.remove('exit');
     iconPair.classList.remove('exit');
-    webviewNav.classList.remove('wv-content-visible', 'nav-5s', 'nav-scroll-collapsed');
+    webviewNav.classList.remove('wv-content-visible', 'nav-scroll-collapsed');
     pbFill.classList.remove('animate');
     pbPlane.classList.remove('animate');
     screenWebview.classList.remove('open');
@@ -1075,7 +1062,7 @@
       resetIcons();
       loadingText.classList.remove('exit');
       iconPair.classList.remove('exit');
-      webviewNav.classList.remove('nav-active', 'wv-content-visible', 'nav-5s', 'nav-scroll-collapsed');
+      webviewNav.classList.remove('nav-active', 'wv-content-visible', 'nav-scroll-collapsed');
       pbFill.classList.remove('animate');
       pbPlane.classList.remove('animate');
       screenLoading.classList.remove('open');
