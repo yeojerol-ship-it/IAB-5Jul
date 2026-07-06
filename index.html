@@ -253,20 +253,18 @@
       inset: 0;
       z-index: 20;
       background: #fff;
-      transform: translateY(100%);
+      opacity: 0;
       pointer-events: none;
-      /* Dismiss: slide down, TUX ease-in */
-      transition: transform 320ms cubic-bezier(0.7, 0, 0.84, 0);
       overflow-y: scroll;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
     }
     .screen-webview::-webkit-scrollbar { display: none; }
     .screen-webview.open {
-      transform: translateY(0);
+      opacity: 1;
       pointer-events: all;
-      /* Entrance: already handled by logo exit animation timing */
-      transition: transform 380ms cubic-bezier(0.16, 1, 0.3, 1);
+      /* Entrance: fade in only, no Y movement */
+      transition: opacity 300ms ease;
     }
     .webview-bg {
       display: block;
@@ -1055,15 +1053,31 @@
 
   function closeLoading() {
     killAll();
-    resetIcons();
-    loadingText.classList.remove('exit');
-    iconPair.classList.remove('exit');
-    webviewNav.classList.remove('nav-active', 'wv-content-visible', 'nav-5s', 'nav-scroll-collapsed');
-    pbFill.classList.remove('animate');
-    pbPlane.classList.remove('animate');
-    screenLoading.classList.remove('open');
-    screenWebview.classList.remove('open');
-    screenWebview.scrollTop = 0;
+
+    // Slide webview + nav down together (dismiss), then reset
+    const SLIDE = 'transform 320ms cubic-bezier(0.7, 0, 0.84, 0)';
+    screenWebview.style.transition = SLIDE;
+    screenWebview.style.transform  = 'translateY(100%)';
+    webviewNav.style.transition    = SLIDE;
+    webviewNav.style.transform     = 'translateY(100%)';
+
+    setTimeout(() => {
+      // Reset inline overrides so CSS classes take over again
+      screenWebview.style.transition = '';
+      screenWebview.style.transform  = '';
+      webviewNav.style.transition    = '';
+      webviewNav.style.transform     = '';
+
+      resetIcons();
+      loadingText.classList.remove('exit');
+      iconPair.classList.remove('exit');
+      webviewNav.classList.remove('nav-active', 'wv-content-visible', 'nav-5s', 'nav-scroll-collapsed');
+      pbFill.classList.remove('animate');
+      pbPlane.classList.remove('animate');
+      screenLoading.classList.remove('open');
+      screenWebview.classList.remove('open');
+      screenWebview.scrollTop = 0;
+    }, 330);
   }
 
   // ── Scroll collapse ───────────────────────────────────────────
