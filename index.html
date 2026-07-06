@@ -381,11 +381,16 @@
       z-index: 2; pointer-events: none;
       transition: top 0.35s ease, gap 0.3s ease;
     }
-    /* Single Figma-exported PNG: TikTok mark · GO badge · separator · Booking.com */
+    /* Word-based logo row: "TikTok GO · Booking" */
     .wv-logo-row {
-      height: 17px; width: auto; display: block;
-      transition: max-height 0.3s ease, opacity 0.3s ease;
-      max-height: 40px; overflow: hidden;
+      font-family: 'TikTok Sans', system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 17px;
+      color: #000;
+      white-space: nowrap;
+      text-align: center;
+      transition: opacity 0.3s ease;
     }
     /* Cashback pill — child of .wv-center, gap-8px handled by flexbox */
     .wv-cashback {
@@ -689,7 +694,7 @@
 
     <!-- ── Centre: TikTok GO + Booking.com + cashback pill (flex-col, gap=8px) ── -->
     <div class="wv-center">
-      <img class="wv-logo-row" src="assets/nav-logo-row.png" alt="" draggable="false" />
+      <div class="wv-logo-row">TikTok GO · Booking</div>
       <div class="wv-cashback" id="cashbackLabel">$60 cashback activated</div>
     </div>
 
