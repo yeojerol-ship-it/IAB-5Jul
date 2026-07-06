@@ -397,7 +397,10 @@
     }
     /* Cashback pill — child of .wv-center, gap-8px handled by flexbox */
     .wv-cashback {
-      padding: 4px 6px 4px 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 1px;
+      padding: 4px 4px 4px 8px;
       border-radius: 100px;
       background: linear-gradient(97.19deg,
         rgba(253,147,216,0.07) 5.09%,
@@ -737,7 +740,12 @@
     <!-- ── Centre: TikTok GO + Booking.com + cashback pill (flex-col, gap=8px) ── -->
     <div class="wv-center">
       <div class="wv-logo-row">TikTok GO · Booking</div>
-      <div class="wv-cashback" id="cashbackLabel">Get 20% cashback &rsaquo;</div>
+      <div class="wv-cashback" id="cashbackLabel">
+        <span>Get 20% TikTok cashback</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M9 18L15 12L9 6" stroke="#e10543" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
     </div>
 
     <!-- ── Ellipsis more button (code) ── -->
