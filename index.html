@@ -59,6 +59,19 @@
     }
 
     /* ── Loading Overlay ── */
+    /* ── Webview page container — slides as one unit ── */
+    .webview-page {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      transform: translateY(100%);
+      transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+      will-change: transform;
+    }
+    .webview-page.active {
+      transform: translateY(0);
+    }
+
     .screen-loading {
       position: absolute;
       inset: 0;
@@ -66,16 +79,14 @@
       display: flex;
       flex-direction: column;
       border-radius: 0;
-
-      /* starts below the phone, slides up on trigger */
-      transform: translateY(100%);
-      transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
-      will-change: transform;
       z-index: 10;
       pointer-events: none;
+      /* No transform — container handles slide */
+      opacity: 0;
+      transition: opacity 0.2s ease;
     }
     .screen-loading.open {
-      transform: translateY(0);
+      opacity: 1;
       pointer-events: all;
     }
 
@@ -251,7 +262,7 @@
     .screen-webview {
       position: absolute;
       inset: 0;
-      z-index: 20;
+      z-index: 1;    /* behind loading overlay within container */
       background: #fff;
       opacity: 0;
       pointer-events: none;
@@ -263,7 +274,6 @@
     .screen-webview.open {
       opacity: 1;
       pointer-events: all;
-      /* Entrance: fade in only, no Y movement */
       transition: opacity 300ms ease;
     }
     .webview-bg {
@@ -282,14 +292,12 @@
       -webkit-backdrop-filter: blur(32px);
               backdrop-filter: blur(32px);
       border-bottom: 1px solid transparent;
-      z-index: 35;
+      z-index: 20;   /* above loading (10) and webview content (1) within container */
       pointer-events: none;
-      transform: translateY(900px);
-      /* Dismiss: ease-in, matches webview slide-down */
-      transition: transform 320ms cubic-bezier(0.7, 0, 0.84, 0),
-                  height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+      /* No translateY — container (.webview-page) handles slide */
+      transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
                   border-color 0.3s ease;
-      will-change: transform, height;
+      will-change: height;
       overflow: hidden;
     }
     /* Separator only visible once webview content is loaded */
@@ -297,11 +305,7 @@
       border-bottom-color: rgba(22, 24, 35, 0.12);
     }
     .webview-nav.nav-active {
-      transform: translateY(0);
-      /* Entrance: ease-out */
-      transition: transform 380ms cubic-bezier(0.16, 1, 0.3, 1),
-                  height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-                  border-color 0.3s ease;
+      pointer-events: all;
     }
 
     /* ── Status bar — PNG clipped to top 47px, always visible ── */
@@ -669,10 +673,11 @@
     <div class="select-hotspot" id="selectHotspot" title="Tap to select hotel"></div>
   </div>
 
-  <!-- ── Loading Overlay ── -->
-  <div class="screen-loading" id="screenLoading">
+  <!-- ── Webview page — slides as one unit on dismiss ── -->
+  <div class="webview-page" id="webviewPage">
 
-    <!-- Loading Body — nav handled by shared #webviewNav overlay -->
+  <!-- Loading overlay (inside page so it slides with it) -->
+  <div class="screen-loading" id="screenLoading">
     <div class="loading-body">
       <div class="icon-pair" id="iconPair">
         <div class="icon-anim icon-anim-left" id="iconLeft">
@@ -684,15 +689,14 @@
       </div>
       <p class="loading-text">Activating your cashback</p>
     </div>
-
   </div>
 
-  <!-- ── Webview content (fades in after exit) ── -->
+  <!-- Webview content (fades in after exit) -->
   <div class="screen-webview" id="screenWebview">
     <img class="webview-bg" src="assets/webview-content.png" alt="Webview" draggable="false" />
   </div>
 
-  <!-- ── Webview nav bar overlay — single component, all states ── -->
+  <!-- Webview nav bar overlay — single component, all states ── -->
   <div class="webview-nav" id="webviewNav">
 
     <!-- Status bar — PNG, clipped to top 47px only -->
@@ -738,6 +742,8 @@
       <img src="assets/nav-plane.png" alt="" />
     </div>
   </div><!-- /.webview-nav -->
+
+  </div><!-- /.webview-page -->
 
   <!-- ── Cashback popover ── -->
   <div class="popover-overlay" id="popoverOverlay">
@@ -1031,6 +1037,8 @@
   }
 
   // ── Open / Close ──────────────────────────────────────────────
+  const webviewPage = document.getElementById('webviewPage');
+
   function openLoading() {
     // Reset state in case of re-open
     loadingText.classList.remove('exit');
@@ -1038,11 +1046,12 @@
     webviewNav.classList.remove('wv-content-visible', 'nav-5s', 'nav-scroll-collapsed');
     pbFill.classList.remove('animate');
     pbPlane.classList.remove('animate');
+    screenWebview.classList.remove('open');
     screenWebview.scrollTop = 0;
 
-    // Show shared nav (loading state: only status bar + X visible)
+    // Slide the entire page up as one unit
+    webviewPage.classList.add('active');
     webviewNav.classList.add('nav-active');
-
     screenLoading.classList.add('open');
     running = true;
     shuffleLoop();
@@ -1054,19 +1063,14 @@
   function closeLoading() {
     killAll();
 
-    // Slide webview + nav down together (dismiss), then reset
-    const SLIDE = 'transform 320ms cubic-bezier(0.7, 0, 0.84, 0)';
-    screenWebview.style.transition = SLIDE;
-    screenWebview.style.transform  = 'translateY(100%)';
-    webviewNav.style.transition    = SLIDE;
-    webviewNav.style.transform     = 'translateY(100%)';
+    // Slide the entire page down as one unit
+    webviewPage.style.transition = 'transform 320ms cubic-bezier(0.7, 0, 0.84, 0)';
+    webviewPage.style.transform  = 'translateY(100%)';
 
     setTimeout(() => {
-      // Reset inline overrides so CSS classes take over again
-      screenWebview.style.transition = '';
-      screenWebview.style.transform  = '';
-      webviewNav.style.transition    = '';
-      webviewNav.style.transform     = '';
+      webviewPage.style.transition = '';
+      webviewPage.style.transform  = '';
+      webviewPage.classList.remove('active');
 
       resetIcons();
       loadingText.classList.remove('exit');
