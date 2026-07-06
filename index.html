@@ -331,22 +331,7 @@
 
     /* ── State 3: scroll-collapsed — only status bar + cashback ── */
     .webview-nav.nav-scroll-collapsed {
-      height: 90px;
-    }
-    .nav-scroll-collapsed .wv-close,
-    .nav-scroll-collapsed .wv-more {
-      opacity: 0;
-      transform: scale(0);
-      pointer-events: none;
-    }
-    .nav-scroll-collapsed .wv-logo-row {
-      max-height: 0;
-      overflow: hidden;
-      opacity: 0;
-    }
-    .nav-scroll-collapsed .wv-center {
-      top: 52px;
-      gap: 0;
+      height: 120px;   /* retain logo row + cashback pill, just hide progress bar */
     }
     .nav-scroll-collapsed .pb-track-svg,
     .nav-scroll-collapsed .pb-fill,
@@ -484,7 +469,7 @@
     .pb-plane {
       position: absolute;
       width: 66px; height: 53px;
-      top: 105px;
+      top: 103px;
       left: 162px;    /* centre of 390px nav: 48 + 147 - 33 = 162px */
       z-index: 5;
       pointer-events: none;
